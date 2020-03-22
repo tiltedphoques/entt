@@ -305,28 +305,25 @@ TEST(NonOwningGroup, IndexRebuiltOnDestroy) {
 
 TEST(NonOwningGroup, ConstNonConstAndAllInBetween) {
     entt::registry registry;
-    auto group = registry.group(entt::get<int, const char, std::true_type>);
+    auto group = registry.group(entt::get<int, const char>);
 
     ASSERT_EQ(group.size(), decltype(group.size()){0});
 
     const auto entity = registry.create();
     registry.assign<int>(entity, 0);
     registry.assign<char>(entity, 'c');
-    registry.assign<std::true_type>(entity);
 
     ASSERT_EQ(group.size(), decltype(group.size()){1});
 
     ASSERT_TRUE((std::is_same_v<decltype(group.get<int>({})), int &>));
     ASSERT_TRUE((std::is_same_v<decltype(group.get<const char>({})), const char &>));
-    ASSERT_TRUE((std::is_same_v<decltype(group.get<std::true_type>({})), std::true_type>));
-    ASSERT_TRUE((std::is_same_v<decltype(group.get<int, const char, std::true_type>({})), std::tuple<int &, const char &, std::true_type>>));
+    ASSERT_TRUE((std::is_same_v<decltype(group.get<int, const char>({})), std::tuple<int &, const char &>>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<const char>()), const char *>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<int>()), int *>));
 
-    group.each([](auto &&i, auto &&c, auto &&e) {
+    group.each([](auto &&i, auto &&c) {
         ASSERT_TRUE((std::is_same_v<decltype(i), int &>));
         ASSERT_TRUE((std::is_same_v<decltype(c), const char &>));
-        ASSERT_TRUE((std::is_same_v<decltype(e), std::true_type &&>));
     });
 }
 
@@ -441,7 +438,7 @@ TEST(NonOwningGroup, EmptyAndNonEmptyTypes) {
         ASSERT_TRUE(entity == e0 || entity == e1);
     }
 
-    group.each([e0, e1](const auto entity, const int &, empty_type) {
+    group.each([e0, e1](const auto entity, const int &) {
         ASSERT_TRUE(entity == e0 || entity == e1);
     });
 
@@ -488,6 +485,28 @@ TEST(NonOwningGroup, Less) {
     });
 
     registry.group(entt::get<int, char, double>).less([](const auto, int, char, double) { FAIL(); });
+}
+
+TEST(NonOwningGroup, FrontBack) {
+    entt::registry registry;
+    auto group = registry.group<>(entt::get<const int, const char>);
+
+    ASSERT_EQ(group.front(), static_cast<entt::entity>(entt::null));
+    ASSERT_EQ(group.back(), static_cast<entt::entity>(entt::null));
+
+    const auto e0 = registry.create();
+    registry.assign<int>(e0);
+    registry.assign<char>(e0);
+
+    const auto e1 = registry.create();
+    registry.assign<int>(e1);
+    registry.assign<char>(e1);
+
+    const auto entity = registry.create();
+    registry.assign<char>(entity);
+
+    ASSERT_EQ(group.front(), e1);
+    ASSERT_EQ(group.back(), e0);
 }
 
 TEST(NonOwningGroup, SignalRace) {
@@ -873,7 +892,7 @@ TEST(OwningGroup, IndexRebuiltOnDestroy) {
 
 TEST(OwningGroup, ConstNonConstAndAllInBetween) {
     entt::registry registry;
-    auto group = registry.group<int, const char>(entt::get<double, const float, std::true_type>);
+    auto group = registry.group<int, const char>(entt::get<double, const float>);
 
     ASSERT_EQ(group.size(), decltype(group.size()){0});
 
@@ -882,7 +901,6 @@ TEST(OwningGroup, ConstNonConstAndAllInBetween) {
     registry.assign<char>(entity, 'c');
     registry.assign<double>(entity, 0.);
     registry.assign<float>(entity, 0.f);
-    registry.assign<std::true_type>(entity);
 
     ASSERT_EQ(group.size(), decltype(group.size()){1});
 
@@ -890,19 +908,17 @@ TEST(OwningGroup, ConstNonConstAndAllInBetween) {
     ASSERT_TRUE((std::is_same_v<decltype(group.get<const char>({})), const char &>));
     ASSERT_TRUE((std::is_same_v<decltype(group.get<double>({})), double &>));
     ASSERT_TRUE((std::is_same_v<decltype(group.get<const float>({})), const float &>));
-    ASSERT_TRUE((std::is_same_v<decltype(group.get<std::true_type>({})), std::true_type>));
-    ASSERT_TRUE((std::is_same_v<decltype(group.get<int, const char, double, const float, std::true_type>({})), std::tuple<int &, const char &, double &, const float &, std::true_type>>));
+    ASSERT_TRUE((std::is_same_v<decltype(group.get<int, const char, double, const float>({})), std::tuple<int &, const char &, double &, const float &>>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<const float>()), const float *>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<double>()), double *>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<const char>()), const char *>));
     ASSERT_TRUE((std::is_same_v<decltype(group.raw<int>()), int *>));
 
-    group.each([](auto &&i, auto &&c, auto &&d, auto &&f, auto &&e) {
+    group.each([](auto &&i, auto &&c, auto &&d, auto &&f) {
         ASSERT_TRUE((std::is_same_v<decltype(i), int &>));
         ASSERT_TRUE((std::is_same_v<decltype(c), const char &>));
         ASSERT_TRUE((std::is_same_v<decltype(d), double &>));
         ASSERT_TRUE((std::is_same_v<decltype(f), const float &>));
-        ASSERT_TRUE((std::is_same_v<decltype(e), std::true_type &&>));
     });
 }
 
@@ -1001,7 +1017,7 @@ TEST(OwningGroup, ExcludedComponents) {
 
 TEST(OwningGroup, EmptyAndNonEmptyTypes) {
     entt::registry registry;
-    const auto group = registry.group<empty_type>(entt::get<int>);
+    const auto group = registry.group<int>(entt::get<empty_type>);
 
     const auto e0 = registry.create();
     registry.assign<empty_type>(e0);
@@ -1017,7 +1033,7 @@ TEST(OwningGroup, EmptyAndNonEmptyTypes) {
         ASSERT_TRUE(entity == e0 || entity == e1);
     }
 
-    group.each([e0, e1](const auto entity, empty_type, const int &) {
+    group.each([e0, e1](const auto entity, const int &) {
         ASSERT_TRUE(entity == e0 || entity == e1);
     });
 
@@ -1066,6 +1082,28 @@ TEST(OwningGroup, Less) {
     registry.group<double>(entt::get<int, char>).less([](const auto, double, int, char) { FAIL(); });
 }
 
+TEST(OwningGroup, FrontBack) {
+    entt::registry registry;
+    auto group = registry.group<const char>(entt::get<const int>);
+
+    ASSERT_EQ(group.front(), static_cast<entt::entity>(entt::null));
+    ASSERT_EQ(group.back(), static_cast<entt::entity>(entt::null));
+
+    const auto e0 = registry.create();
+    registry.assign<int>(e0);
+    registry.assign<char>(e0);
+
+    const auto e1 = registry.create();
+    registry.assign<int>(e1);
+    registry.assign<char>(e1);
+
+    const auto entity = registry.create();
+    registry.assign<char>(entity);
+
+    ASSERT_EQ(group.front(), e1);
+    ASSERT_EQ(group.back(), e0);
+}
+
 TEST(OwningGroup, SignalRace) {
     entt::registry registry;
     registry.on_construct<double>().connect<&entt::registry::assign_or_replace<int>>();
@@ -1075,4 +1113,34 @@ TEST(OwningGroup, SignalRace) {
     registry.assign<double>(entity);
 
     ASSERT_EQ(registry.group<int>(entt::get<double>).size(), 1u);
+}
+
+TEST(OwningGroup, StableLateInitialization) {
+    entt::registry registry;
+
+    for(std::size_t i{}; i < 30u; ++i) {
+        auto entity = registry.create();
+        if(!(i % 2u)) registry.assign<int>(entity);
+        if(!(i % 3u)) registry.assign<char>(entity);
+    }
+
+    // thanks to @pgruenbacher for pointing out this corner case
+    ASSERT_EQ((registry.group<int, char>().size()), 5u);
+}
+
+TEST(OwningGroup, PreventEarlyOptOut) {
+    entt::registry registry;
+
+    registry.assign<int>(registry.create(), 3);
+
+    const auto entity = registry.create();
+    registry.assign<char>(entity, 'c');
+    registry.assign<int>(entity, 2);
+
+    // thanks to @pgruenbacher for pointing out this corner case
+    registry.group<char, int>().each([entity](const auto entt, const auto &c, const auto &i) {
+        ASSERT_EQ(entity, entt);
+        ASSERT_EQ(c, 'c');
+        ASSERT_EQ(i, 2);
+    });
 }

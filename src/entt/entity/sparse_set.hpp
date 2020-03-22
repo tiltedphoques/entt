@@ -52,7 +52,7 @@ class sparse_set {
     static_assert(ENTT_PAGE_SIZE && ((ENTT_PAGE_SIZE & (ENTT_PAGE_SIZE - 1)) == 0));
     static constexpr auto entt_per_page = ENTT_PAGE_SIZE / sizeof(typename traits_type::entity_type);
 
-    class iterator {
+    class iterator final {
         friend class sparse_set<Entity>;
 
         using direct_type = std::vector<Entity>;
@@ -77,7 +77,7 @@ class sparse_set {
 
         iterator operator++(int) ENTT_NOEXCEPT {
             iterator orig = *this;
-            return ++(*this), orig;
+            return operator++(), orig;
         }
 
         iterator & operator--() ENTT_NOEXCEPT {
@@ -86,7 +86,7 @@ class sparse_set {
 
         iterator operator--(int) ENTT_NOEXCEPT {
             iterator orig = *this;
-            return --(*this), orig;
+            return operator--(), orig;
         }
 
         iterator & operator+=(const difference_type value) ENTT_NOEXCEPT {
@@ -186,40 +186,11 @@ public:
     /*! @brief Default constructor. */
     sparse_set() = default;
 
-    /**
-     * @brief Copy constructor.
-     * @param other The instance to copy from.
-     */
-    sparse_set(const sparse_set &other)
-        : reverse{},
-          direct{other.direct}
-    {
-        for(size_type pos{}, last = other.reverse.size(); pos < last; ++pos) {
-            if(other.reverse[pos]) {
-                std::copy_n(other.reverse[pos].get(), entt_per_page, assure(pos));
-            }
-        }
-    }
-
     /*! @brief Default move constructor. */
     sparse_set(sparse_set &&) = default;
 
     /*! @brief Default destructor. */
     virtual ~sparse_set() = default;
-
-    /**
-     * @brief Copy assignment operator.
-     * @param other The instance to copy from.
-     * @return This sparse set.
-     */
-    sparse_set & operator=(const sparse_set &other) {
-        if(&other != this) {
-            auto tmp{other};
-            *this = std::move(tmp);
-        }
-
-        return *this;
-    }
 
     /*! @brief Default move assignment operator. @return This sparse set. */
     sparse_set & operator=(sparse_set &&) = default;
@@ -396,10 +367,16 @@ public:
      *
      * @param entt A valid entity identifier.
      */
-    void construct(const entity_type entt) {
+    void emplace(const entity_type entt) {
         ENTT_ASSERT(!has(entt));
         assure(page(entt))[offset(entt)] = entity_type(direct.size());
         direct.push_back(entt);
+    }
+
+    /*! @copydoc emplace */
+    [[deprecated("use ::emplace instead")]]
+    void construct(const entity_type entt) {
+        emplace(entt);
     }
 
     /**
@@ -416,13 +393,20 @@ public:
      * @param last An iterator past the last element of the range of entities.
      */
     template<typename It>
-    void construct(It first, It last) {
+    void insert(It first, It last) {
         std::for_each(first, last, [this, next = direct.size()](const auto entt) mutable {
             ENTT_ASSERT(!has(entt));
             assure(page(entt))[offset(entt)] = entity_type(next++);
         });
 
         direct.insert(direct.end(), first, last);
+    }
+
+    /*! @copydoc insert */
+    template<typename It>
+    [[deprecated("use ::insert instead")]]
+    void construct(It first, It last) {
+        insert(std::move(first), std::move(last));
     }
 
     /**

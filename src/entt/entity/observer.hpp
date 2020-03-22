@@ -6,12 +6,12 @@
 #include <cstddef>
 #include <cstdint>
 #include <utility>
-#include <algorithm>
 #include <type_traits>
 #include "../config/config.h"
 #include "../core/type_traits.hpp"
 #include "registry.hpp"
 #include "storage.hpp"
+#include "utility.hpp"
 #include "entity.hpp"
 #include "fwd.hpp"
 
@@ -160,7 +160,7 @@ constexpr basic_collector<> collector{};
  * behavior.
  *
  * @warning
- * Lifetime of an observer doesn't necessarily have to overcome the one of the
+ * Lifetime of an observer doesn't necessarily have to overcome that of the
  * registry to which it is connected. However, the observer must be disconnected
  * from the registry before being destroyed to avoid crashes due to dangling
  * pointers.
@@ -178,7 +178,7 @@ class basic_observer {
     struct matcher_handler<matcher<type_list<Reject...>, type_list<Require...>, AnyOf>> {
         template<std::size_t Index>
         static void maybe_valid_if(basic_observer &obs, const basic_registry<Entity> &reg, const Entity entt) {
-            if(reg.template has<Require...>(entt) && !(reg.template has<Reject>(entt) || ...)) {
+            if(reg.template has<Require...>(entt) && !reg.template any<Reject...>(entt)) {
                 if(auto *comp = obs.view.try_get(entt); !comp) {
                     obs.view.construct(entt);
                 }
@@ -198,14 +198,14 @@ class basic_observer {
         static void connect(basic_observer &obs, basic_registry<Entity> &reg) {
             (reg.template on_destroy<Require>().template connect<&discard_if<Index>>(obs), ...);
             (reg.template on_construct<Reject>().template connect<&discard_if<Index>>(obs), ...);
-            reg.template on_replace<AnyOf>().template connect<&maybe_valid_if<Index>>(obs);
+            reg.template on_update<AnyOf>().template connect<&maybe_valid_if<Index>>(obs);
             reg.template on_destroy<AnyOf>().template connect<&discard_if<Index>>(obs);
         }
 
         static void disconnect(basic_observer &obs, basic_registry<Entity> &reg) {
             (reg.template on_destroy<Require>().disconnect(obs), ...);
             (reg.template on_construct<Reject>().disconnect(obs), ...);
-            reg.template on_replace<AnyOf>().disconnect(obs);
+            reg.template on_update<AnyOf>().disconnect(obs);
             reg.template on_destroy<AnyOf>().disconnect(obs);
         }
     };
@@ -214,7 +214,7 @@ class basic_observer {
     struct matcher_handler<matcher<type_list<Reject...>, type_list<Require...>, type_list<NoneOf...>, AllOf...>> {
         template<std::size_t Index>
         static void maybe_valid_if(basic_observer &obs, const basic_registry<Entity> &reg, const Entity entt) {
-            if(reg.template has<AllOf..., Require...>(entt) && !(reg.template has<NoneOf>(entt) || ...) && !(reg.template has<Reject>(entt) || ...)) {
+            if(reg.template has<AllOf..., Require...>(entt) && !reg.template any<NoneOf..., Reject...>(entt)) {
                 if(auto *comp = obs.view.try_get(entt); !comp) {
                     obs.view.construct(entt);
                 }
@@ -409,7 +409,10 @@ public:
     template<typename Func>
     void each(Func func) const {
         static_assert(std::is_invocable_v<Func, entity_type>);
-        std::for_each(begin(), end(), std::move(func));
+
+        for(const auto entity: *this) {
+            func(entity);
+        }
     }
 
     /**

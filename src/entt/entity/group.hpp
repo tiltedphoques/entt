@@ -9,7 +9,8 @@
 #include "../core/type_traits.hpp"
 #include "sparse_set.hpp"
 #include "storage.hpp"
-#include "helper.hpp"
+#include "utility.hpp"
+#include "entity.hpp"
 #include "fwd.hpp"
 
 
@@ -55,7 +56,7 @@ class basic_group;
  * all of them because they _share_ entities and components).
  *
  * @warning
- * Lifetime of a group must overcome the one of the registry that generated it.
+ * Lifetime of a group must not overcome that of the registry that generated it.
  * In any other case, attempting to use a group results in undefined behavior.
  *
  * @tparam Entity A valid entity type (see entt_traits for more details).
@@ -233,6 +234,26 @@ public:
     }
 
     /**
+     * @brief Returns the first entity that has the given components, if any.
+     * @return The first entity that has the given components if one exists, the
+     * null entity otherwise.
+     */
+    entity_type front() const {
+        const auto it = begin();
+        return it != end() ? *it : null;
+    }
+
+    /**
+     * @brief Returns the last entity that has the given components, if any.
+     * @return The last entity that has the given components if one exists, the
+     * null entity otherwise.
+     */
+    entity_type back() const {
+        const auto it = std::make_reverse_iterator(end());
+        return it != std::make_reverse_iterator(begin()) ? *it : null;
+    }
+
+    /**
      * @brief Finds an entity.
      * @param entt A valid entity identifier.
      * @return An iterator to the given entity if it's found, past the end
@@ -294,27 +315,27 @@ public:
      * object to them.
      *
      * The function object is invoked for each entity. It is provided with the
-     * entity itself and a set of references to all its components. The
+     * entity itself and a set of references to non-empty components. The
      * _constness_ of the components is as requested.<br/>
      * The signature of the function must be equivalent to one of the following
      * forms:
      *
      * @code{.cpp}
-     * void(const entity_type, Get &...);
-     * void(Get &...);
+     * void(const entity_type, Type &...);
+     * void(Type &...);
      * @endcode
      *
      * @note
-     * Empty types aren't explicitly instantiated. Therefore, temporary objects
-     * are returned during iterations. They can be caught only by copy or with
-     * const references.
+     * Empty types aren't explicitly instantiated and therefore they are never
+     * returned during iterations.
      *
      * @tparam Func Type of the function object to invoke.
      * @param func A valid function object.
      */
     template<typename Func>
     void each(Func func) const {
-        traverse(std::move(func), type_list<Get...>{});
+        using get_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Get), type_list<>, type_list<Get>>...>;
+        traverse(std::move(func), get_type_list{});
     }
 
     /**
@@ -332,15 +353,17 @@ public:
      * void(Type &...);
      * @endcode
      *
-     * @sa each
+     * @note
+     * Empty types aren't explicitly instantiated and therefore they are never
+     * returned during iterations.
      *
      * @tparam Func Type of the function object to invoke.
      * @param func A valid function object.
      */
     template<typename Func>
+    [[deprecated("use ::each instead")]]
     void less(Func func) const {
-        using get_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Get), type_list<>, type_list<Get>>...>;
-        traverse(std::move(func), get_type_list{});
+        each(std::move(func));
     }
 
     /**
@@ -465,7 +488,7 @@ private:
  * of them because they share the underlying data structure).
  *
  * @warning
- * Lifetime of a group must overcome the one of the registry that generated it.
+ * Lifetime of a group must not overcome that of the registry that generated it.
  * In any other case, attempting to use a group results in undefined behavior.
  *
  * @tparam Entity A valid entity type (see entt_traits for more details).
@@ -649,6 +672,26 @@ public:
     }
 
     /**
+     * @brief Returns the first entity that has the given components, if any.
+     * @return The first entity that has the given components if one exists, the
+     * null entity otherwise.
+     */
+    entity_type front() const {
+        const auto it = begin();
+        return it != end() ? *it : null;
+    }
+
+    /**
+     * @brief Returns the last entity that has the given components, if any.
+     * @return The last entity that has the given components if one exists, the
+     * null entity otherwise.
+     */
+    entity_type back() const {
+        const auto it = std::make_reverse_iterator(end());
+        return it != std::make_reverse_iterator(begin()) ? *it : null;
+    }
+
+    /**
      * @brief Finds an entity.
      * @param entt A valid entity identifier.
      * @return An iterator to the given entity if it's found, past the end
@@ -710,27 +753,28 @@ public:
      * object to them.
      *
      * The function object is invoked for each entity. It is provided with the
-     * entity itself and a set of references to all its components. The
+     * entity itself and a set of references to non-empty components. The
      * _constness_ of the components is as requested.<br/>
      * The signature of the function must be equivalent to one of the following
      * forms:
      *
      * @code{.cpp}
-     * void(const entity_type, Owned &..., Get &...);
-     * void(Owned &..., Get &...);
+     * void(const entity_type, Type &...);
+     * void(Type &...);
      * @endcode
      *
      * @note
-     * Empty types aren't explicitly instantiated. Therefore, temporary objects
-     * are returned during iterations. They can be caught only by copy or with
-     * const references.
+     * Empty types aren't explicitly instantiated and therefore they are never
+     * returned during iterations.
      *
      * @tparam Func Type of the function object to invoke.
      * @param func A valid function object.
      */
     template<typename Func>
     void each(Func func) const {
-        traverse(std::move(func), type_list<Owned...>{}, type_list<Get...>{});
+        using owned_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Owned), type_list<>, type_list<Owned>>...>;
+        using get_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Get), type_list<>, type_list<Get>>...>;
+        traverse(std::move(func), owned_type_list{}, get_type_list{});
     }
 
     /**
@@ -748,16 +792,17 @@ public:
      * void(Type &...);
      * @endcode
      *
-     * @sa each
+     * @note
+     * Empty types aren't explicitly instantiated and therefore they are never
+     * returned during iterations.
      *
      * @tparam Func Type of the function object to invoke.
      * @param func A valid function object.
      */
     template<typename Func>
+    [[deprecated("use ::each instead")]]
     void less(Func func) const {
-        using owned_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Owned), type_list<>, type_list<Owned>>...>;
-        using get_type_list = type_list_cat_t<std::conditional_t<ENTT_ENABLE_ETO(Get), type_list<>, type_list<Get>>...>;
-        traverse(std::move(func), owned_type_list{}, get_type_list{});
+        each(std::move(func));
     }
 
     /**

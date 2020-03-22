@@ -9,7 +9,6 @@
 #include <type_traits>
 #include "../config/config.h"
 #include "sparse_set.hpp"
-#include "entity.hpp"
 #include "fwd.hpp"
 
 
@@ -49,7 +48,7 @@ namespace entt {
  * have a valid reference and won't be updated accordingly).
  *
  * @warning
- * Lifetime of a view must overcome the one of the registry that generated it.
+ * Lifetime of a view must not overcome that of the registry that generated it.
  * In any other case, attempting to use a view results in undefined behavior.
  *
  * @tparam Entity A valid entity type (see entt_traits for more details).
@@ -61,7 +60,7 @@ class basic_runtime_view {
 
     using underlying_iterator_type = typename sparse_set<Entity>::iterator_type;
 
-    class iterator {
+    class iterator final {
         friend class basic_runtime_view<Entity>;
 
         using direct_type = std::vector<const sparse_set<Entity> *>;
@@ -97,7 +96,7 @@ class basic_runtime_view {
 
         iterator operator++(int) {
             iterator orig = *this;
-            return ++(*this), orig;
+            return operator++(), orig;
         }
 
         iterator & operator--() ENTT_NOEXCEPT {
@@ -107,7 +106,7 @@ class basic_runtime_view {
 
         iterator operator--(int) ENTT_NOEXCEPT {
             iterator orig = *this;
-            return --(*this), orig;
+            return operator--(), orig;
         }
 
         bool operator==(const iterator &other) const ENTT_NOEXCEPT {
@@ -247,7 +246,9 @@ public:
      */
     template<typename Func>
     void each(Func func) const {
-        std::for_each(begin(), end(), func);
+        for(const auto entity: *this) {
+            func(entity);
+        }
     }
 
 private:

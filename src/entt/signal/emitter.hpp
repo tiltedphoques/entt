@@ -2,15 +2,16 @@
 #define ENTT_SIGNAL_EMITTER_HPP
 
 
-#include <type_traits>
-#include <functional>
 #include <algorithm>
-#include <utility>
-#include <memory>
-#include <vector>
-#include <list>
+#include <functional>
 #include <iterator>
+#include <list>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 #include "../config/config.h"
+#include "../core/fwd.hpp"
 #include "../core/type_info.hpp"
 
 
@@ -44,11 +45,11 @@ class emitter {
         virtual ~basic_pool() = default;
         virtual bool empty() const ENTT_NOEXCEPT = 0;
         virtual void clear() ENTT_NOEXCEPT = 0;
-        virtual ENTT_ID_TYPE type_id() const ENTT_NOEXCEPT = 0;
+        virtual id_type type_id() const ENTT_NOEXCEPT = 0;
     };
 
     template<typename Event>
-    struct pool_handler: basic_pool {
+    struct pool_handler final: basic_pool {
         using listener_type = std::function<void(const Event &, Derived &)>;
         using element_type = std::pair<bool, listener_type>;
         using container_type = std::list<element_type>;
@@ -63,9 +64,13 @@ class emitter {
 
         void clear() ENTT_NOEXCEPT override {
             if(publishing) {
-                auto func = [](auto &&element) { element.first = true; };
-                std::for_each(once_list.begin(), once_list.end(), func);
-                std::for_each(on_list.begin(), on_list.end(), func);
+                for(auto &&element: once_list) {
+                    element.first = true;
+                }
+
+                for(auto &&element: on_list) {
+                    element.first = true;
+                }
             } else {
                 once_list.clear();
                 on_list.clear();
@@ -94,21 +99,22 @@ class emitter {
             container_type swap_list;
             once_list.swap(swap_list);
 
-            auto func = [&event, &ref](auto &&element) {
-                return element.first ? void() : element.second(event, ref);
-            };
-
             publishing = true;
 
-            std::for_each(on_list.rbegin(), on_list.rend(), func);
-            std::for_each(swap_list.rbegin(), swap_list.rend(), func);
+            for(auto &&element: on_list) {
+                element.first ? void() : element.second(event, ref);
+            }
+
+            for(auto &&element: swap_list) {
+                element.first ? void() : element.second(event, ref);
+            }
 
             publishing = false;
 
             on_list.remove_if([](auto &&element) { return element.first; });
         }
 
-        ENTT_ID_TYPE type_id() const ENTT_NOEXCEPT override {
+        id_type type_id() const ENTT_NOEXCEPT override {
             return type_info<Event>::id();
         }
 
@@ -123,13 +129,11 @@ class emitter {
         static_assert(std::is_same_v<Event, std::decay_t<Event>>);
         static std::size_t index{pools.size()};
 
-        if(!(index < pools.size()) || pools[index]->type_id() != type_info<Event>::id()) {
-            index = std::find_if(pools.cbegin(), pools.cend(), [](auto &&cpool) {
-                return cpool->type_id() == type_info<Event>::id();
-            }) - pools.cbegin();
+        if(const auto length = pools.size(); !(index < length) || pools[index]->type_id() != type_info<Event>::id()) {
+            for(index = {}; index < length && pools[index]->type_id() != type_info<Event>::id(); ++index);
 
             if(index == pools.size()) {
-                pools.push_back(std::make_unique<pool_handler<Event>>());
+                pools.emplace_back(new pool_handler<Event>{});
             }
         }
 
@@ -286,9 +290,9 @@ public:
      * results in undefined behavior.
      */
     void clear() ENTT_NOEXCEPT {
-        std::for_each(pools.begin(), pools.end(), [](auto &&cpool) {
+        for(auto &&cpool: pools) {
             cpool->clear();
-        });
+        }
     }
 
     /**

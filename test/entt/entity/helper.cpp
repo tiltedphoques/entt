@@ -1,8 +1,14 @@
 #include <gtest/gtest.h>
 #include <entt/core/hashed_string.hpp>
 #include <entt/entity/helper.hpp>
+#include <entt/entity/entity.hpp>
 #include <entt/entity/registry.hpp>
 #include <entt/core/type_traits.hpp>
+
+struct clazz {
+    void func(entt::registry &, entt::entity curr) { entt = curr; }
+    entt::entity entt{entt::null};
+};
 
 TEST(Helper, AsView) {
     entt::registry registry;
@@ -23,27 +29,12 @@ TEST(Helper, AsGroup) {
     ([](entt::group<entt::exclude_t<int>, entt::get_t<const char>, const double>) {})(entt::as_group{registry});
 }
 
-TEST(Helper, Tag) {
+TEST(Invoke, MemberFunction) {
     entt::registry registry;
     const auto entity = registry.create();
-    registry.assign<entt::tag<"foobar"_hs>>(entity);
-    registry.assign<int>(entity, 42);
-    int counter{};
 
-    ASSERT_FALSE(registry.has<entt::tag<"barfoo"_hs>>(entity));
-    ASSERT_TRUE(registry.has<entt::tag<"foobar"_hs>>(entity));
+    registry.on_construct<clazz>().connect<entt::invoke<&clazz::func>>();
+    registry.assign<clazz>(entity);
 
-    for(auto entt: registry.view<int, entt::tag<"foobar"_hs>>()) {
-        (void)entt;
-        ++counter;
-    }
-
-    ASSERT_NE(counter, 0);
-
-    for(auto entt: registry.view<entt::tag<"foobar"_hs>>()) {
-        (void)entt;
-        --counter;
-    }
-
-    ASSERT_EQ(counter, 0);
+    ASSERT_EQ(entity, registry.get<clazz>(entity).entt);
 }

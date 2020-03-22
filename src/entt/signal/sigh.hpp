@@ -97,9 +97,9 @@ public:
      * @param args Arguments to use to invoke listeners.
      */
     void publish(Args... args) const {
-        std::for_each(calls.cbegin(), calls.cend(), [&args...](auto &&call) {
+        for(auto &&call: std::as_const(calls)) {
             call(args...);
-        });
+        }
     }
 
     /**
@@ -318,7 +318,7 @@ public:
      * or a bound member.
      * @tparam Candidate Member or free function to look for.
      * @tparam Type Type of class or type of payload.
-     * @param value_or_instance A valid reference that fits the purpose.
+     * @param value_or_instance A valid object that fits the purpose.
      * @return A properly initialized sink object.
      */
     template<auto Candidate, typename Type>
@@ -407,15 +407,15 @@ public:
      *
      * The signal isn't responsible for the connected object or the payload.
      * Users must always guarantee that the lifetime of the instance overcomes
-     * the one  of the delegate. On the other side, the signal handler performs
+     * the one of the signal. On the other side, the signal handler performs
      * checks to avoid multiple connections for the same function.<br/>
      * When used to connect a free function with payload, its signature must be
      * such that the instance is the first argument before the ones used to
-     * define the delegate itself.
+     * define the signal itself.
      *
-     * @tparam Candidate Function or member to connect to the delegate.
+     * @tparam Candidate Function or member to connect to the signal.
      * @tparam Type Type of class or type of payload.
-     * @param value_or_instance A valid reference that fits the purpose.
+     * @param value_or_instance A valid object that fits the purpose.
      * @return A properly initialized connection object.
      */
     template<auto Candidate, typename Type>
@@ -433,7 +433,7 @@ public:
 
     /**
      * @brief Disconnects a free function or an unbound member from a signal.
-     * @tparam Candidate Function or member to disconnect from the delegate.
+     * @tparam Candidate Function or member to disconnect from the signal.
      */
     template<auto Candidate>
     void disconnect() {
@@ -446,9 +446,9 @@ public:
     /**
      * @brief Disconnects a free function with payload or a bound member from a
      * signal.
-     * @tparam Candidate Function or member to disconnect from the delegate.
+     * @tparam Candidate Function or member to disconnect from the signal.
      * @tparam Type Type of class or type of payload.
-     * @param value_or_instance A valid reference that fits the purpose.
+     * @param value_or_instance A valid object that fits the purpose.
      */
     template<auto Candidate, typename Type>
     void disconnect(Type &&value_or_instance) {

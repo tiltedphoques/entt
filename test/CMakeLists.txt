@@ -2,69 +2,90 @@
 # Tests configuration
 #
 
+include(FetchContent)
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 if(FIND_GTEST_PACKAGE)
     find_package(GTest REQUIRED)
 else()
-    # gtest, gtest_main, gmock and gmock_main targets are available from now on
-    set(GOOGLETEST_DEPS_DIR ${EnTT_SOURCE_DIR}/deps/googletest)
-    configure_file(${EnTT_SOURCE_DIR}/cmake/in/googletest.in ${GOOGLETEST_DEPS_DIR}/CMakeLists.txt)
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . WORKING_DIRECTORY ${GOOGLETEST_DEPS_DIR})
-    execute_process(COMMAND ${CMAKE_COMMAND} --build . WORKING_DIRECTORY ${GOOGLETEST_DEPS_DIR})
-    set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
-    add_subdirectory(${GOOGLETEST_DEPS_DIR}/src ${GOOGLETEST_DEPS_DIR}/build)
-    target_compile_features(gmock_main PRIVATE $<TARGET_PROPERTY:EnTT,INTERFACE_COMPILE_FEATURES>)
-    target_compile_features(gmock PRIVATE $<TARGET_PROPERTY:EnTT,INTERFACE_COMPILE_FEATURES>)
+    FetchContent_Declare(
+        googletest
+        GIT_REPOSITORY https://github.com/google/googletest.git
+        GIT_TAG master
+        GIT_SHALLOW 1
+    )
+
+    FetchContent_GetProperties(googletest)
+
+    if(NOT googletest_POPULATED)
+        FetchContent_Populate(googletest)
+        set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+        add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+    endif()
+
     add_library(GTest::Main ALIAS gtest_main)
+
+    target_compile_features(gtest PUBLIC cxx_std_17)
+    target_compile_features(gtest_main PUBLIC cxx_std_17)
+    target_compile_features(gmock PUBLIC cxx_std_17)
+    target_compile_features(gmock_main PUBLIC cxx_std_17)
 endif()
 
 include_directories($<TARGET_PROPERTY:EnTT,INTERFACE_INCLUDE_DIRECTORIES>)
 add_compile_options($<TARGET_PROPERTY:EnTT,INTERFACE_COMPILE_OPTIONS>)
 
-macro(SETUP_TARGET TARGET_NAME)
+function(SETUP_TARGET TARGET_NAME)
     set_target_properties(${TARGET_NAME} PROPERTIES CXX_EXTENSIONS OFF)
     target_link_libraries(${TARGET_NAME} PRIVATE EnTT)
 
     target_compile_options(
         ${TARGET_NAME}
-        PRIVATE $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-O0 -g -pedantic -Wall -Wshadow -fvisibility=hidden>
-        PRIVATE $<$<AND:$<CONFIG:Release>,$<NOT:$<PLATFORM_ID:Windows>>>:-O2 -pedantic -Wall -Wshadow -fvisibility=hidden>
-        PRIVATE $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Windows>>:/EHsc /W1>
-        PRIVATE $<$<AND:$<CONFIG:Release>,$<PLATFORM_ID:Windows>>:/EHsc /W1 /O2>
+        PRIVATE
+            $<$<NOT:$<PLATFORM_ID:Windows>>:-pedantic -fvisibility=hidden -Wall -Wshadow -Wno-deprecated-declarations>
+            $<$<PLATFORM_ID:Windows>:/EHsc /W1 /wd4996 /w14800>
     )
-endmacro()
+
+    target_compile_options(
+        ${TARGET_NAME}
+        PRIVATE
+            $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-O0 -g>
+            $<$<AND:$<CONFIG:Release>,$<NOT:$<PLATFORM_ID:Windows>>>:-O2>
+            $<$<AND:$<CONFIG:Debug>,$<PLATFORM_ID:Windows>>:/Od>
+            $<$<AND:$<CONFIG:Release>,$<PLATFORM_ID:Windows>>:/O2>
+    )
+endfunction()
 
 add_library(odr OBJECT odr.cpp)
 SETUP_TARGET(odr)
 
-macro(SETUP_BASIC_TEST TEST_NAME TEST_SOURCE)
-    add_executable(${TEST_NAME} $<TARGET_OBJECTS:odr> ${TEST_SOURCE})
+function(SETUP_BASIC_TEST TEST_NAME TEST_SOURCES)
+    add_executable(${TEST_NAME} $<TARGET_OBJECTS:odr> ${TEST_SOURCES})
     target_link_libraries(${TEST_NAME} PRIVATE GTest::Main Threads::Threads)
     SETUP_TARGET(${TEST_NAME})
     add_test(NAME ${TEST_NAME} COMMAND ${TEST_NAME})
-endmacro()
+endfunction()
 
-macro(SETUP_LIB_TEST TEST_NAME)
+function(SETUP_LIB_TEST TEST_NAME)
     add_library(_${TEST_NAME} SHARED lib/${TEST_NAME}/lib.cpp)
     SETUP_TARGET(_${TEST_NAME})
     SETUP_BASIC_TEST(lib_${TEST_NAME} lib/${TEST_NAME}/main.cpp)
     target_compile_definitions(_${TEST_NAME} PRIVATE ENTT_API_EXPORT ${ARGV1})
     target_compile_definitions(lib_${TEST_NAME} PRIVATE ENTT_API_IMPORT ${ARGV1})
     target_link_libraries(lib_${TEST_NAME} PRIVATE _${TEST_NAME})
-endmacro()
+endfunction()
 
-macro(SETUP_PLUGIN_TEST TEST_NAME)
+function(SETUP_PLUGIN_TEST TEST_NAME)
     add_library(_${TEST_NAME} MODULE lib/${TEST_NAME}/plugin.cpp)
     SETUP_TARGET(_${TEST_NAME})
     SETUP_BASIC_TEST(lib_${TEST_NAME} lib/${TEST_NAME}/main.cpp)
-    target_include_directories(_${TEST_NAME} PRIVATE ${CR_SRC_DIR})
-    target_include_directories(lib_${TEST_NAME} PRIVATE ${CR_SRC_DIR})
+    target_include_directories(_${TEST_NAME} PRIVATE ${cr_INCLUDE_DIR})
+    target_include_directories(lib_${TEST_NAME} PRIVATE ${cr_INCLUDE_DIR})
     target_compile_definitions(lib_${TEST_NAME} PRIVATE NOMINMAX PLUGIN="$<TARGET_FILE:_${TEST_NAME}>" ${ARGV1})
     target_compile_definitions(_${TEST_NAME} PRIVATE NOMINMAX ${ARGV1})
     target_link_libraries(lib_${TEST_NAME} PRIVATE ${CMAKE_DL_LIBS})
-endmacro()
+endfunction()
 
 # Test benchmark
 
@@ -75,11 +96,19 @@ endif()
 # Test lib
 
 if(BUILD_LIB)
-    set(CR_DEPS_DIR ${EnTT_SOURCE_DIR}/deps/cr)
-    configure_file(${EnTT_SOURCE_DIR}/cmake/in/cr.in ${CR_DEPS_DIR}/CMakeLists.txt)
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . WORKING_DIRECTORY ${CR_DEPS_DIR})
-    execute_process(COMMAND ${CMAKE_COMMAND} --build . WORKING_DIRECTORY ${CR_DEPS_DIR})
-    set(CR_SRC_DIR ${CR_DEPS_DIR}/src)
+    FetchContent_Declare(
+        cr
+        GIT_REPOSITORY https://github.com/fungos/cr.git
+        GIT_TAG master
+        GIT_SHALLOW 1
+    )
+
+    FetchContent_GetProperties(cr)
+
+    if(NOT cr_POPULATED)
+        FetchContent_Populate(cr)
+        set(cr_INCLUDE_DIR ${cr_SOURCE_DIR})
+    endif()
 
     SETUP_LIB_TEST(dispatcher)
     SETUP_LIB_TEST(emitter)
@@ -105,14 +134,22 @@ endif()
 # Test snapshot
 
 if(BUILD_SNAPSHOT)
-    set(CEREAL_DEPS_DIR ${EnTT_SOURCE_DIR}/deps/cereal)
-    configure_file(${EnTT_SOURCE_DIR}/cmake/in/cereal.in ${CEREAL_DEPS_DIR}/CMakeLists.txt)
-    execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" . WORKING_DIRECTORY ${CEREAL_DEPS_DIR})
-    execute_process(COMMAND ${CMAKE_COMMAND} --build . WORKING_DIRECTORY ${CEREAL_DEPS_DIR})
-    set(CEREAL_SRC_DIR ${CEREAL_DEPS_DIR}/src/include)
+    FetchContent_Declare(
+        cereal
+        GIT_REPOSITORY https://github.com/USCiLab/cereal.git
+        GIT_TAG v1.2.2
+        GIT_SHALLOW 1
+    )
+
+    FetchContent_GetProperties(cereal)
+
+    if(NOT cereal_POPULATED)
+        FetchContent_Populate(cereal)
+        set(cereal_INCLUDE_DIR ${cereal_SOURCE_DIR}/include)
+    endif()
 
     SETUP_BASIC_TEST(cereal snapshot/snapshot.cpp)
-    target_include_directories(cereal PRIVATE ${CEREAL_SRC_DIR})
+    target_include_directories(cereal PRIVATE ${cereal_INCLUDE_DIR})
 endif()
 
 # Test core

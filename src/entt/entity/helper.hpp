@@ -3,44 +3,14 @@
 
 
 #include <type_traits>
-#include "../core/type_traits.hpp"
 #include "../config/config.h"
+#include "../core/type_traits.hpp"
+#include "../signal/delegate.hpp"
+#include "registry.hpp"
 #include "fwd.hpp"
 
 
 namespace entt {
-
-
-/**
- * @brief Alias for exclusion lists.
- * @tparam Type List of types.
- */
-template<typename... Type>
-struct exclude_t: type_list<Type...> {};
-
-
-/**
- * @brief Variable template for exclusion lists.
- * @tparam Type List of types.
- */
-template<typename... Type>
-constexpr exclude_t<Type...> exclude{};
-
-
-/**
- * @brief Alias for lists of observed components.
- * @tparam Type List of types.
- */
-template<typename... Type>
-struct get_t: type_list<Type...>{};
-
-
-/**
- * @brief Variable template for lists of observed components.
- * @tparam Type List of types.
- */
-template<typename... Type>
-constexpr get_t<Type...> get{};
 
 
 /**
@@ -142,27 +112,21 @@ template<typename Entity>
 as_group(const basic_registry<Entity> &) ENTT_NOEXCEPT -> as_group<true, Entity>;
 
 
+
 /**
- * @brief Alias template to ease the assignment of tags to entities.
- *
- * If used in combination with hashed strings, it simplifies the assignment of
- * tags to entities and the use of tags in general where a type would be
- * required otherwise.<br/>
- * As an example and where the user defined literal for hashed strings hasn't
- * been changed:
- * @code{.cpp}
- * entt::registry registry;
- * registry.assign<entt::tag<"enemy"_hs>>(entity);
- * @endcode
- *
- * @note
- * Tags are empty components and therefore candidates for the empty component
- * optimization.
- *
- * @tparam Value The numeric representation of an instance of hashed string.
+ * @brief Helper to create a listener that directly invokes a member function.
+ * @tparam Member Member function to invoke on a component of the given type.
+ * @tparam Entity A valid entity type (see entt_traits for more details).
+ * @param reg A registry that contains the given entity and its components.
+ * @param entt Entity from which to get the component.
  */
-template<ENTT_ID_TYPE Value>
-using tag = std::integral_constant<ENTT_ID_TYPE, Value>;
+template<auto Member, typename Entity = entity>
+void invoke(basic_registry<Entity> &reg, const Entity entt) {
+    static_assert(std::is_member_function_pointer_v<decltype(Member)>);
+    delegate<void(basic_registry<Entity> &, const Entity)> func;
+    func.template connect<Member>(reg.template get<member_class_t<decltype(Member)>>(entt));
+    func(reg, entt);
+}
 
 
 }

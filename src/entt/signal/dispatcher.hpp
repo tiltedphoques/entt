@@ -2,13 +2,13 @@
 #define ENTT_SIGNAL_DISPATCHER_HPP
 
 
-#include <vector>
-#include <memory>
 #include <cstddef>
-#include <utility>
-#include <algorithm>
+#include <memory>
 #include <type_traits>
+#include <utility>
+#include <vector>
 #include "../config/config.h"
+#include "../core/fwd.hpp"
 #include "../core/type_info.hpp"
 #include "sigh.hpp"
 
@@ -25,20 +25,19 @@ namespace entt {
  * type `Event`, listeners are such that they can be invoked with an argument of
  * type `const Event &`, no matter what the return type is.
  *
- * The types of the instances are `Class &`. Users must guarantee that the
- * lifetimes of the objects overcome the one of the dispatcher itself to avoid
- * crashes.
+ * The dispatcher creates instances of the `sigh` class internally. Refer to the
+ * documentation of the latter for more details.
  */
 class dispatcher {
     struct basic_pool {
         virtual ~basic_pool() = default;
         virtual void publish() = 0;
         virtual void clear() ENTT_NOEXCEPT = 0;
-        virtual ENTT_ID_TYPE type_id() const ENTT_NOEXCEPT = 0;
+        virtual id_type type_id() const ENTT_NOEXCEPT = 0;
     };
 
     template<typename Event>
-    struct pool_handler: basic_pool {
+    struct pool_handler final: basic_pool {
         using signal_type = sigh<void(const Event &)>;
         using sink_type = typename signal_type::sink_type;
 
@@ -70,7 +69,7 @@ class dispatcher {
             events.emplace_back(std::forward<Args>(args)...);
         }
 
-        ENTT_ID_TYPE type_id() const ENTT_NOEXCEPT override {
+        id_type type_id() const ENTT_NOEXCEPT override {
             return type_info<Event>::id();
         }
 
@@ -84,13 +83,11 @@ class dispatcher {
         static_assert(std::is_same_v<Event, std::decay_t<Event>>);
         static std::size_t index{pools.size()};
 
-        if(!(index < pools.size()) || pools[index]->type_id() != type_info<Event>::id()) {
-            index = std::find_if(pools.cbegin(), pools.cend(), [](auto &&cpool) {
-                return cpool->type_id() == type_info<Event>::id();
-            }) - pools.cbegin();
+        if(const auto length = pools.size(); !(index < length) || pools[index]->type_id() != type_info<Event>::id()) {
+            for(index = {}; index < length && pools[index]->type_id() != type_info<Event>::id(); ++index);
 
             if(index == pools.size()) {
-                pools.push_back(std::make_unique<pool_handler<Event>>());
+                pools.emplace_back(new pool_handler<Event>{});
             }
         }
 
@@ -189,9 +186,9 @@ public:
     template<typename... Event>
     void clear() {
         if constexpr(sizeof...(Event) == 0) {
-            std::for_each(pools.begin(), pools.end(), [](auto &&cpool) {
+            for(auto &&cpool: pools) {
                 cpool->clear();
-            });
+            }
         } else {
             (assure<Event>().clear(), ...);
         }

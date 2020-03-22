@@ -50,6 +50,8 @@ I hope this list can grow much more in the future:
     RPG game made from scratch in C++.
   * [Robotligan](https://github.com/Trisslotten/robotligan): multiplayer
     football game.
+  * [DungeonSlayer](https://github.com/alohaeee/DungeonSlayer): 2D game made
+    from scratch in C++.
 
 * Engines and the like:
   * [Fling Engine](https://github.com/flingengine/FlingEngine): a Vulkan game
@@ -74,6 +76,10 @@ I hope this list can grow much more in the future:
     developed for educational purposes.
   * [Lumos](https://github.com/jmorton06/Lumos): game engine written in C++
     using OpenGL and Vulkan.
+  * [Chrysalis](https://github.com/ivanhawkes/Chrysalis): action RPG SDK for
+    CRYENGINE games.
+  * [LM-Engine](https://github.com/Lawrencemm/LM-Engine): the Vim of game
+    engines.
 
 * Articles and blog posts:
   * [Some posts](https://skypjack.github.io/tags/#entt) on my personal
@@ -89,6 +95,9 @@ I hope this list can grow much more in the future:
     giant space battle.
   * [Conan Adventures (SFML and EnTT in C++)](https://leinnan.github.io/blog/conan-adventuressfml-and-entt-in-c.html):
     create projects in modern C++ using `SFML`, `EnTT`, `Conan` and `CMake`.
+  * [Adding EnTT ECS to Chrysalis](https://www.tauradius.com/post/adding-an-ecs-to-chrysalis/):
+    a blog entry about the process followed and the results of the integration
+    of `EnTT` into `Chrysalis`.
 
 * Any Other Business:
   * The [ArcGIS Runtime SDKs](https://developers.arcgis.com/arcgis-runtime/)

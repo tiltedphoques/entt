@@ -2,7 +2,7 @@
 # EnTT
 #
 
-cmake_minimum_required(VERSION 3.7.2)
+cmake_minimum_required(VERSION 3.12.4)
 
 #
 # Building in-tree is not allowed (we take care of your craziness).
@@ -13,25 +13,33 @@ if(${CMAKE_SOURCE_DIR} STREQUAL ${CMAKE_BINARY_DIR})
 endif()
 
 #
+# Read project version
+#
+
+set(ENTT_VERSION_REGEX "#define ENTT_VERSION_.*[ \t]+(.+)")
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/entt/config/version.h" ENTT_VERSION REGEX ${ENTT_VERSION_REGEX})
+list(TRANSFORM ENTT_VERSION REPLACE ${ENTT_VERSION_REGEX} "\\1")
+string(JOIN "." ENTT_VERSION ${ENTT_VERSION})
+
+#
 # Project configuration
 #
 
-project(EnTT VERSION 3.3.0 LANGUAGES CXX)
-
-include(GNUInstallDirs)
+project(
+    EnTT
+    VERSION ${ENTT_VERSION}
+    DESCRIPTION "Gaming meets modern C++ - a fast and reliable entity-component system (ECS) and much more"
+    HOMEPAGE_URL "https://github.com/skypjack/entt"
+    LANGUAGES CXX
+)
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-set(SETTINGS_ORGANIZATION "Michele Caini")
-set(SETTINGS_APPLICATION ${PROJECT_NAME})
-set(PROJECT_AUTHOR "Michele Caini")
-set(PROJECT_AUTHOR_EMAIL "michele.caini@gmail.com")
-
 message("*")
 message("* ${PROJECT_NAME} v${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
-message("* Copyright (c) 2017-2020 ${PROJECT_AUTHOR} <${PROJECT_AUTHOR_EMAIL}>")
+message("* Copyright (c) 2017-2020 Michele Caini <michele.caini@gmail.com>")
 message("*")
 
 option(USE_LIBCPP "Use libc++ by adding -stdlib=libc++ flag if availbale." ON)
@@ -65,26 +73,21 @@ endif()
 # Add EnTT target
 #
 
+include(GNUInstallDirs)
+
 add_library(EnTT INTERFACE)
 add_library(EnTT::EnTT ALIAS EnTT)
 
-configure_file(${EnTT_SOURCE_DIR}/cmake/in/version.h.in ${EnTT_SOURCE_DIR}/src/entt/config/version.h @ONLY)
-
 target_include_directories(
-    EnTT INTERFACE
-    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
-    $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
-)
-
-target_compile_definitions(
     EnTT
-    INTERFACE $<$<AND:$<CONFIG:Debug>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:DEBUG>
-    INTERFACE $<$<AND:$<CONFIG:Release>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:RELEASE>
+    INTERFACE
+        $<BUILD_INTERFACE:${EnTT_SOURCE_DIR}/src>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 if(USE_ASAN)
-    target_compile_options(EnTT INTERFACE $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-fsanitize=address -fno-omit-frame-pointer>)
-    target_link_libraries(EnTT INTERFACE $<$<AND:$<CONFIG:Debug>,$<NOT:$<PLATFORM_ID:Windows>>>:-fsanitize=address -fno-omit-frame-pointer>)
+    target_compile_options(EnTT INTERFACE $<$<CONFIG:Debug>:-fsanitize=address -fno-omit-frame-pointer>)
+    target_link_libraries(EnTT INTERFACE $<$<CONFIG:Debug>:-fsanitize=address -fno-omit-frame-pointer>)
 endif()
 
 if(HAS_LIBCPP)
@@ -97,16 +100,28 @@ target_compile_features(EnTT INTERFACE cxx_std_17)
 # Install EnTT
 #
 
+include(CMakePackageConfigHelpers)
+
 if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
     set(CUSTOM_INSTALL_CONFIGDIR cmake)
 else()
     set(CUSTOM_INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/entt)
 endif()
 
-install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 install(TARGETS EnTT EXPORT EnTTTargets)
 
-export(EXPORT EnTTTargets FILE ${EnTT_BINARY_DIR}/EnTTTargets.cmake)
+configure_package_config_file(
+    ${EnTT_SOURCE_DIR}/cmake/in/EnTTConfig.cmake.in
+    EnTTConfig.cmake
+    INSTALL_DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
+    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+)
+
+write_basic_package_version_file(
+    EnTTConfigVersion.cmake
+    VERSION ${PROJECT_VERSION}
+    COMPATIBILITY AnyNewerVersion
+)
 
 install(
     EXPORT EnTTTargets
@@ -115,39 +130,14 @@ install(
     NAMESPACE EnTT::
 )
 
-#
-# Build tree package config file
-#
-
-configure_file(cmake/in/EnTTBuildConfig.cmake.in EnTTConfig.cmake @ONLY)
-
-include(CMakePackageConfigHelpers)
-
-#
-# Install tree package config file
-#
-
-configure_package_config_file(
-    cmake/in/EnTTConfig.cmake.in
-    ${CUSTOM_INSTALL_CONFIGDIR}/EnTTConfig.cmake
-    INSTALL_DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
-    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
-)
-
-write_basic_package_version_file(
-    ${EnTT_BINARY_DIR}/EnTTConfigVersion.cmake
-    VERSION ${PROJECT_VERSION}
-    COMPATIBILITY AnyNewerVersion
-)
-
 install(
     FILES
-        ${EnTT_BINARY_DIR}/${CUSTOM_INSTALL_CONFIGDIR}/EnTTConfig.cmake
-        ${EnTT_BINARY_DIR}/EnTTConfigVersion.cmake
+        ${PROJECT_BINARY_DIR}/EnTTConfig.cmake
+        ${PROJECT_BINARY_DIR}/EnTTConfigVersion.cmake
     DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
 )
 
-export(PACKAGE EnTT)
+install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
 
 #
 # Tests
@@ -157,7 +147,6 @@ option(BUILD_TESTING "Enable testing with ctest." OFF)
 
 if(BUILD_TESTING)
     option(FIND_GTEST_PACKAGE "Enable finding gtest package." OFF)
-
     option(BUILD_BENCHMARK "Build benchmark." OFF)
     option(BUILD_LIB "Build lib example." OFF)
     option(BUILD_SNAPSHOT "Build snapshot example." OFF)
@@ -184,12 +173,12 @@ endif()
 # AOB
 #
 
-FILE(GLOB GH_WORKFLOWS .github/workflows/*.yml)
-
 add_custom_target(
-    entt_aob
+    aob
     SOURCES
-        ${GH_WORKFLOWS}
+        .github/workflows/build.yml
+        .github/workflows/coverage.yml
+        .github/workflows/deploy.yml
         .github/FUNDING.yml
         AUTHORS
         CONTRIBUTING.md

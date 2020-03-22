@@ -6,6 +6,7 @@
 #include <type_traits>
 #include "../config/config.h"
 #include "../core/type_traits.hpp"
+#include "../core/fwd.hpp"
 
 
 namespace entt {
@@ -157,6 +158,10 @@ constexpr bool operator!=(const Entity entity, null other) ENTT_NOEXCEPT {
  * Internal details not to be documented.
  * @endcond TURN_OFF_DOXYGEN
  */
+
+
+/*! @brief Default entity identifier. */
+ENTT_OPAQUE_TYPE(entity, id_type);
 
 
 /**

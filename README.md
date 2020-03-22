@@ -6,7 +6,7 @@
 [![GitHub version](https://badge.fury.io/gh/skypjack%2Fentt.svg)](https://github.com/skypjack/entt/releases)
 [![Build Status](https://github.com/skypjack/entt/workflows/build/badge.svg)](https://github.com/skypjack/entt/actions)
 [![Coverage](https://codecov.io/gh/skypjack/entt/branch/master/graph/badge.svg)](https://codecov.io/gh/skypjack/entt)
-[![Try online](https://img.shields.io/badge/try-online-brightgreen)](https://godbolt.org/z/v8txVr)
+[![Try online](https://img.shields.io/badge/try-online-brightgreen)](https://godbolt.org/z/cOUcm1)
 [![Gitter chat](https://badges.gitter.im/skypjack/entt.png)](https://gitter.im/skypjack/entt)
 [![Donate](https://img.shields.io/badge/donate-paypal-blue.svg)](https://www.paypal.me/skypjack)
 [![Patreon](https://img.shields.io/badge/become-patron-red.svg)](https://www.patreon.com/bePatron?c=1772573)
@@ -17,7 +17,9 @@ much more written in **modern C++**, mainly known for its innovative
 [Among others](https://github.com/skypjack/entt/wiki/EnTT-in-Action), it's used
 in [**Minecraft**](https://minecraft.net/en-us/attribution/) by Mojang and the
 [**ArcGIS Runtime SDKs**](https://developers.arcgis.com/arcgis-runtime/) by
-Esri. Open an issue or submit a PR if you don't see your project in the list!
+Esri.<br/>
+If you don't see your project in the list, please open an issue, submit a PR or
+add the [#entt](https://github.com/topics/entt) tag to your _topics_! :+1:
 
 ---
 
@@ -151,8 +153,8 @@ int main() {
 
     for(auto i = 0; i < 10; ++i) {
         auto entity = registry.create();
-        registry.assign<position>(entity, i * 1.f, i * 1.f);
-        if(i % 2 == 0) { registry.assign<velocity>(entity, i * .1f, i * .1f); }
+        registry.emplace<position>(entity, i * 1.f, i * 1.f);
+        if(i % 2 == 0) { registry.emplace<velocity>(entity, i * .1f, i * .1f); }
     }
 
     update(dt, registry);
@@ -219,6 +221,11 @@ documentation:
 
 * `CMake` version 3.7 or later.
 * `Doxygen` version 1.8 or later.
+
+Alternatively, [Bazel](https://bazel.build) is also supported as a build system
+(credits to [zaucy](https://github.com/zaucy) who offered to maintain it).<br/>
+In the documentation below I'll still refer to `CMake`, this being the official
+build system of the library.
 
 If you are looking for a C++14 version of `EnTT`, check out the git tag `cpp14`.
 

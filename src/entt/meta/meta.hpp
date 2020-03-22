@@ -3,10 +3,11 @@
 
 
 #include <cstddef>
-#include <utility>
 #include <functional>
 #include <type_traits>
+#include <utility>
 #include "../config/config.h"
+#include "../core/fwd.hpp"
 #include "../core/type_info.hpp"
 #include "../core/type_traits.hpp"
 
@@ -71,7 +72,7 @@ struct meta_dtor_node {
 
 
 struct meta_data_node {
-    ENTT_ID_TYPE identifier;
+    id_type alias;
     meta_type_node * const parent;
     meta_data_node * next;
     meta_prop_node * prop;
@@ -85,7 +86,7 @@ struct meta_data_node {
 
 struct meta_func_node {
     using size_type = std::size_t;
-    ENTT_ID_TYPE identifier;
+    id_type alias;
     meta_type_node * const parent;
     meta_func_node * next;
     meta_prop_node * prop;
@@ -100,8 +101,8 @@ struct meta_func_node {
 
 struct meta_type_node {
     using size_type = std::size_t;
-    const ENTT_ID_TYPE id;
-    ENTT_ID_TYPE identifier;
+    const id_type type_id;
+    id_type alias;
     meta_type_node * next;
     meta_prop_node * prop;
     const bool is_void;
@@ -327,7 +328,14 @@ class meta_any {
 
 public:
     /*! @brief Default constructor. */
-    meta_any() ENTT_NOEXCEPT = default;
+    meta_any() ENTT_NOEXCEPT
+        : storage{},
+          instance{},
+          node{},
+          destroy_fn{},
+          copy_fn{},
+          steal_fn{}
+    {}
 
     /**
      * @brief Constructs a meta any by directly initializing the new object.
@@ -455,9 +463,9 @@ public:
     const Type * try_cast() const {
         void *ret = nullptr;
 
-        if(const auto id = internal::meta_info<Type>::resolve()->id; node && node->id == id) {
+        if(const auto type_id = internal::meta_info<Type>::resolve()->type_id; node && node->type_id == type_id) {
             ret = instance;
-        } else if(const auto *base = internal::find_if<&internal::meta_type_node::base>([id](const auto *curr) { return curr->type()->id == id; }, node); base) {
+        } else if(const auto *base = internal::find_if<&internal::meta_type_node::base>([type_id](const auto *curr) { return curr->type()->type_id == type_id; }, node); base) {
             ret = base->cast(instance);
         }
 
@@ -507,9 +515,9 @@ public:
     meta_any convert() const {
         meta_any any{};
 
-        if(const auto id = internal::meta_info<Type>::resolve()->id; node && node->id == id) {
+        if(const auto type_id = internal::meta_info<Type>::resolve()->type_id; node && node->type_id == type_id) {
             any = *this;
-        } else if(const auto * const conv = internal::find_if<&internal::meta_type_node::conv>([id](const auto *curr) { return curr->type()->id == id; }, node); conv) {
+        } else if(const auto * const conv = internal::find_if<&internal::meta_type_node::conv>([type_id](const auto *curr) { return curr->type()->type_id == type_id; }, node); conv) {
             any = conv->conv(instance);
         }
 
@@ -523,11 +531,12 @@ public:
      */
     template<typename Type>
     bool convert() {
-        bool valid = (node && node->id == internal::meta_info<Type>::resolve()->id);
+        bool valid = (node && node->type_id == internal::meta_info<Type>::resolve()->type_id);
 
         if(!valid) {
-            if(auto any = std::as_const(*this).convert<Type>(); (valid = static_cast<bool>(any))) {
+            if(auto any = std::as_const(*this).convert<Type>(); any) {
                 swap(any, *this);
+                valid = true;
             }
         }
 
@@ -559,7 +568,7 @@ public:
      * @return False if the container is empty, true otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
     /**
@@ -569,7 +578,7 @@ public:
      * otherwise.
      */
     bool operator==(const meta_any &other) const {
-        return (!node && !other.node) || (node && other.node && node->id == other.node->id && node->compare(instance, other.instance));
+        return (!node && !other.node) || (node && other.node && node->type_id == other.node->type_id && node->compare(instance, other.instance));
     }
 
     /**
@@ -616,7 +625,9 @@ private:
  */
 struct meta_handle {
     /*! @brief Default constructor. */
-    meta_handle() = default;
+    meta_handle()
+        : any{}
+    {}
 
     /**
      * @brief Creates an alias for the actual object.
@@ -687,7 +698,7 @@ struct meta_prop {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -725,7 +736,7 @@ struct meta_base {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -760,7 +771,7 @@ struct meta_conv {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -844,7 +855,7 @@ struct meta_ctor {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -859,9 +870,9 @@ struct meta_data {
         : node{curr}
     {}
 
-    /*! @copydoc meta_type::identifier */
-    ENTT_ID_TYPE identifier() const ENTT_NOEXCEPT {
-        return node->identifier;
+    /*! @copydoc meta_type::alias */
+    id_type alias() const ENTT_NOEXCEPT {
+        return node->alias;
     }
 
     /*! @copydoc meta_base::parent */
@@ -981,7 +992,7 @@ struct meta_data {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -999,9 +1010,9 @@ struct meta_func {
         : node{curr}
     {}
 
-    /*! @copydoc meta_type::identifier */
-    ENTT_ID_TYPE identifier() const ENTT_NOEXCEPT {
-        return node->identifier;
+    /*! @copydoc meta_type::alias */
+    id_type alias() const ENTT_NOEXCEPT {
+        return node->alias;
     }
 
     /*! @copydoc meta_base::parent */
@@ -1092,7 +1103,7 @@ struct meta_func {
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
 private:
@@ -1106,9 +1117,9 @@ class meta_type {
     auto ctor(std::index_sequence<Indexes...>) const {
         return internal::find_if([](const auto *candidate) {
             return candidate->size == sizeof...(Args) && ([](auto *from, auto *to) {
-                return (from->id == to->id)
-                        || internal::find_if<&internal::meta_type_node::base>([to](const auto *curr) { return curr->type()->id == to->id; }, from)
-                        || internal::find_if<&internal::meta_type_node::conv>([to](const auto *curr) { return curr->type()->id == to->id; }, from);
+                return (from->type_id == to->type_id)
+                        || internal::find_if<&internal::meta_type_node::base>([to](const auto *curr) { return curr->type()->type_id == to->type_id; }, from)
+                        || internal::find_if<&internal::meta_type_node::conv>([to](const auto *curr) { return curr->type()->type_id == to->type_id; }, from);
             }(internal::meta_info<Args>::resolve(), candidate->arg(Indexes)) && ...);
         }, node->ctor);
     }
@@ -1123,11 +1134,19 @@ public:
     {}
 
     /**
-     * @brief Returns the identifier assigned to a given meta object.
-     * @return The identifier assigned to the meta object.
+     * @brief Returns the id of the underlying type.
+     * @return The id of the underlying type.
      */
-    ENTT_ID_TYPE identifier() const ENTT_NOEXCEPT {
-        return node->identifier;
+    id_type id() const ENTT_NOEXCEPT {
+        return node->type_id;
+    }
+
+    /**
+     * @brief Returns the alias assigned to a given meta object.
+     * @return The alias assigned to the meta object.
+     */
+    id_type alias() const ENTT_NOEXCEPT {
+        return node->alias;
     }
 
     /**
@@ -1268,13 +1287,13 @@ public:
     }
 
     /**
-     * @brief Returns the meta base associated with a given identifier.
-     * @param identifier Unique identifier.
-     * @return The meta base associated with the given identifier, if any.
+     * @brief Returns the meta base associated with a given alias.
+     * @param alias Unique identifier.
+     * @return The meta base associated with the given alias, if any.
      */
-    meta_base base(const ENTT_ID_TYPE identifier) const {
-        return internal::find_if<&internal::meta_type_node::base>([identifier](const auto *curr) {
-            return curr->type()->identifier == identifier;
+    meta_base base(const id_type alias) const {
+        return internal::find_if<&internal::meta_type_node::base>([alias](const auto *curr) {
+            return curr->type()->alias == alias;
         }, node);
     }
 
@@ -1296,8 +1315,8 @@ public:
      */
     template<typename Type>
     meta_conv conv() const {
-        return internal::find_if<&internal::meta_type_node::conv>([id = internal::meta_info<Type>::resolve()->id](const auto *curr) {
-            return curr->type()->id == id;
+        return internal::find_if<&internal::meta_type_node::conv>([type_id = internal::meta_info<Type>::resolve()->type_id](const auto *curr) {
+            return curr->type()->type_id == type_id;
         }, node);
     }
 
@@ -1336,16 +1355,16 @@ public:
     }
 
     /**
-     * @brief Returns the meta data associated with a given identifier.
+     * @brief Returns the meta data associated with a given alias.
      *
      * The meta data of the base classes will also be visited, if any.
      *
-     * @param identifier Unique identifier.
-     * @return The meta data associated with the given identifier, if any.
+     * @param alias Unique identifier.
+     * @return The meta data associated with the given alias, if any.
      */
-    meta_data data(const ENTT_ID_TYPE identifier) const {
-        return internal::find_if<&internal::meta_type_node::data>([identifier](const auto *curr) {
-            return curr->identifier == identifier;
+    meta_data data(const id_type alias) const {
+        return internal::find_if<&internal::meta_type_node::data>([alias](const auto *curr) {
+            return curr->alias == alias;
         }, node);
     }
 
@@ -1364,16 +1383,16 @@ public:
     }
 
     /**
-     * @brief Returns the meta function associated with a given identifier.
+     * @brief Returns the meta function associated with a given alias.
      *
      * The meta functions of the base classes will also be visited, if any.
      *
-     * @param identifier Unique identifier.
-     * @return The meta function associated with the given identifier, if any.
+     * @param alias Unique identifier.
+     * @return The meta function associated with the given alias, if any.
      */
-    meta_func func(const ENTT_ID_TYPE identifier) const {
-        return internal::find_if<&internal::meta_type_node::func>([identifier](const auto *curr) {
-            return curr->identifier == identifier;
+    meta_func func(const id_type alias) const {
+        return internal::find_if<&internal::meta_type_node::func>([alias](const auto *curr) {
+            return curr->alias == alias;
         }, node);
     }
 
@@ -1390,7 +1409,7 @@ public:
      */
     template<typename... Args>
     meta_any construct(Args &&... args) const {
-        auto construct_if = [this](auto *params) {
+        auto construct_if = [this](meta_any *params) {
             meta_any any{};
 
             internal::find_if<&internal::meta_type_node::ctor>([params, &any](const auto *curr) {
@@ -1441,7 +1460,7 @@ public:
      * @return True if the meta object is valid, false otherwise.
      */
     explicit operator bool() const ENTT_NOEXCEPT {
-        return node;
+        return !(node == nullptr);
     }
 
     /**
@@ -1451,7 +1470,7 @@ public:
      * otherwise.
      */
     bool operator==(const meta_type &other) const ENTT_NOEXCEPT {
-        return (!node && !other.node) || (node && other.node && node->id == other.node->id);
+        return (!node && !other.node) || (node && other.node && node->type_id == other.node->type_id);
     }
 
 private:

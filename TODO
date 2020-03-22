@@ -7,19 +7,26 @@
 * allow to replace std:: with custom implementations
 * custom (decoupled) pools ==> N-buffering, shared components, multi-model, hibitsets, and so on
 * add examples (and credits) from @alanjfs :)
-* static reflection, hint: template<> meta_type_t<Type>: meta_descriptor<name, func..., props..., etc...>
-* add meta support to registry (eg entity for each component and opaque get)
-* allow for custom stamp functions
+* static reflection, hint: template<> meta_type_t<Type>: meta_descriptor<name, func..., props..., etc...> (see #342)
 * observer: user defined filters (eg .replace<T, &function> or .group<T, U, &func>)
-* use underlying_type as entity type within pools and registry? it would make different registries work together flawlessy
 * can we write a bool conv func for entt::entity that silently compares it to null?
 * reset... reset everywhere...
 * is it possible to make 0 the entity null?
 * document undocumented parts (entt::overload and a few others)
 * any-of rule for views/groups (eg entity has A and any of B/C/D)
   - get -> all, exclude -> none
-* deprecate sigh::publish, use operator()
-* remove args... from registry::assure and the others (index would be duplicated)
+
+Next:
+* replace observer class with observer functions
+* get(cmp, entity) -> void *, set(cmp, entity, void *)
+* ENTT_ENABLE_ETO -> ENTT_IS_EMPTY (ignore default constructible)
+* review multi component views to reduce instantiations once empty types are gone...
+* avoid using deprecated functions all around
+* accept fixed type iterators like std::container<T> does  rather than all possible types
+
+* WIP:
+ - deprecate snapshot, loader, ...
+ - provide documentation to describe alternatives
 
 * WIP: snapshot rework/deprecation
  - remove snapshot/loader from registry, make them external (faster) tools

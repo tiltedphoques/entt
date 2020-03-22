@@ -36,20 +36,18 @@
 #endif
 
 
-#ifndef ENTT_DISABLE_ASSERT
+#ifndef ENTT_ASSERT
 #   include <cassert>
 #   define ENTT_ASSERT(condition) assert(condition)
-#else
-#   define ENTT_ASSERT(...) ((void)0)
 #endif
 
 
 #ifndef ENTT_DISABLE_ETO
 #   include <type_traits>
-#   define ENTT_ENABLE_ETO(Type) std::is_empty_v<Type>
+#   define ENTT_ENABLE_ETO(Type) (std::is_default_constructible_v<Type> && std::is_empty_v<Type>)
 #else
 #   // sfinae-friendly definition
-#   define ENTT_ENABLE_ETO(Type) (false && std::is_empty_v<Type>)
+#   define ENTT_ENABLE_ETO(Type) (false && std::is_void_v<Type>)
 #endif
 
 
