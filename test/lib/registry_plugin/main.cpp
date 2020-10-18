@@ -2,44 +2,39 @@
 
 #include <cr.h>
 #include <gtest/gtest.h>
+#include <entt/core/type_info.hpp>
 #include <entt/entity/registry.hpp>
-#include "proxy.h"
 #include "types.h"
 
-proxy::proxy(entt::registry &ref)
-    : registry{&ref}
-{}
-
-void proxy::for_each(void(*cb)(position &, velocity &)) {
-    registry->view<position, velocity>().each(cb);
-}
-
-void proxy::assign(velocity vel) {
-    for(auto entity: registry->view<position>()) {
-        registry->assign<velocity>(entity, vel);
-    }
-}
+template<typename Type>
+struct entt::type_index<Type> {};
 
 TEST(Lib, Registry) {
     entt::registry registry;
-    proxy handler{registry};
 
     for(auto i = 0; i < 3; ++i) {
         const auto entity = registry.create();
-        registry.assign<position>(entity, i, i);
+        registry.emplace<position>(entity, i, i);
+
+        if(i % 2) {
+            registry.emplace<tag>(entity);
+        }
     }
 
     cr_plugin ctx;
-    ctx.userdata = &handler;
+    ctx.userdata = &registry;
     cr_plugin_load(ctx, PLUGIN);
     cr_plugin_update(ctx);
 
     ASSERT_EQ(registry.size<position>(), registry.size<velocity>());
+    ASSERT_NE(registry.size<position>(), registry.size());
+    ASSERT_TRUE(registry.empty<tag>());
 
     registry.view<position>().each([](auto entity, auto &position) {
-        ASSERT_EQ(position.x, entt::to_integral(entity) + 16);
-        ASSERT_EQ(position.y, entt::to_integral(entity) + 16);
+        ASSERT_EQ(position.x, static_cast<int>(entt::to_integral(entity) + 16u));
+        ASSERT_EQ(position.y, static_cast<int>(entt::to_integral(entity) + 16u));
     });
 
+    registry = {};
     cr_plugin_close(ctx);
 }

@@ -5,12 +5,12 @@
 namespace entt {
 
 
-/*! @brief Empty class type used to request the _as alias_ policy. */
-struct as_alias_t {};
+/*! @brief Empty class type used to request the _as ref_ policy. */
+struct as_ref_t {};
 
 
 /*! @brief Disambiguation tag. */
-constexpr as_alias_t as_alias;
+inline constexpr as_ref_t as_ref;
 
 
 /*! @brief Empty class type used to request the _as-is_ policy. */

@@ -37,10 +37,10 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif()
 
-message("*")
-message("* ${PROJECT_NAME} v${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
-message("* Copyright (c) 2017-2020 Michele Caini <michele.caini@gmail.com>")
-message("*")
+message(VERBOSE "*")
+message(VERBOSE "* ${PROJECT_NAME} v${PROJECT_VERSION} (${CMAKE_BUILD_TYPE})")
+message(VERBOSE "* Copyright (c) 2017-2020 Michele Caini <michele.caini@gmail.com>")
+message(VERBOSE "*")
 
 option(USE_LIBCPP "Use libc++ by adding -stdlib=libc++ flag if availbale." ON)
 option(USE_ASAN "Use address sanitizer by adding -fsanitize=address -fno-omit-frame-pointer flags" OFF)
@@ -63,7 +63,7 @@ if(NOT WIN32 AND USE_LIBCPP)
     " HAS_LIBCPP)
 
     if(NOT HAS_LIBCPP)
-        message(WARNING "The option USE_LIBCPP is set (by default) but libc++ is not available. The flag will not be added to the target.")
+        message(VERBOSE "The option USE_LIBCPP is set (by default) but libc++ is not available. The flag will not be added to the target.")
     endif()
 
     cmake_pop_check_state()
@@ -102,19 +102,10 @@ target_compile_features(EnTT INTERFACE cxx_std_17)
 
 include(CMakePackageConfigHelpers)
 
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Windows")
-    set(CUSTOM_INSTALL_CONFIGDIR cmake)
-else()
-    set(CUSTOM_INSTALL_CONFIGDIR ${CMAKE_INSTALL_LIBDIR}/cmake/entt)
-endif()
-
-install(TARGETS EnTT EXPORT EnTTTargets)
-
-configure_package_config_file(
-    ${EnTT_SOURCE_DIR}/cmake/in/EnTTConfig.cmake.in
-    EnTTConfig.cmake
-    INSTALL_DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
-    PATH_VARS CMAKE_INSTALL_INCLUDEDIR
+install(
+    TARGETS EnTT
+    EXPORT EnTTTargets
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
 write_basic_package_version_file(
@@ -123,10 +114,22 @@ write_basic_package_version_file(
     COMPATIBILITY AnyNewerVersion
 )
 
+configure_package_config_file(
+    ${EnTT_SOURCE_DIR}/cmake/in/EnTTConfig.cmake.in
+    EnTTConfig.cmake
+    INSTALL_DESTINATION ${CMAKE_INSTALL_LIBDIR}/EnTT/cmake
+)
+
+export(
+    EXPORT EnTTTargets
+    FILE ${CMAKE_CURRENT_BINARY_DIR}/EnTTTargets.cmake
+    NAMESPACE EnTT::
+)
+
 install(
     EXPORT EnTTTargets
     FILE EnTTTargets.cmake
-    DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/EnTT/cmake
     NAMESPACE EnTT::
 )
 
@@ -134,22 +137,25 @@ install(
     FILES
         ${PROJECT_BINARY_DIR}/EnTTConfig.cmake
         ${PROJECT_BINARY_DIR}/EnTTConfigVersion.cmake
-    DESTINATION ${CUSTOM_INSTALL_CONFIGDIR}
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/EnTT/cmake
 )
 
 install(DIRECTORY src/ DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+export(PACKAGE EnTT)
 
 #
 # Tests
 #
 
-option(BUILD_TESTING "Enable testing with ctest." OFF)
+include(CTest)
 
 if(BUILD_TESTING)
     option(FIND_GTEST_PACKAGE "Enable finding gtest package." OFF)
     option(BUILD_BENCHMARK "Build benchmark." OFF)
-    option(BUILD_LIB "Build lib example." OFF)
-    option(BUILD_SNAPSHOT "Build snapshot example." OFF)
+    option(BUILD_EXAMPLE "Build examples." OFF)
+    option(BUILD_LIB "Build lib tests." OFF)
+    option(BUILD_SNAPSHOT "Build snapshot test with Cereal." OFF)
 
     enable_testing()
     add_subdirectory(test)
